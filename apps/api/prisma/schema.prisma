@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WalletCurrency {
+  STARS
+  TICKETS
+}
+
+enum LedgerEntryType {
+  INITIAL_BALANCE
+  DAILY_REWARD
+  MISSION_REWARD
+  GAME_BET
+  GAME_WIN
+  PVP_BET
+  PVP_REWARD
+  ADMIN_ADJUSTMENT
+}
+
+enum GameType {
+  COIN_FLIP
+  POCKET_POOL
+}
+
+enum GameRoundStatus {
+  RESOLVING
+  FINISHED
+  CANCELLED
+}
+
+enum PvpRoomStatus {
+  FINISHED
+  CANCELLED
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  telegramId   BigInt        @unique
+  firstName    String        @db.VarChar(128)
+  lastName     String?       @db.VarChar(128)
+  username     String?       @db.VarChar(64)
+  languageCode String?       @db.VarChar(16)
+  photoUrl     String?       @db.Text
+  isPremium    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  wallets      Wallet[]
+  ledgerEntries LedgerEntry[]
+  gameRounds    GameRound[]
+  fairnessSeeds ProvablyFairSeed[]
+  dailyRewards  DailyReward[]
+  pvpRooms      PvpRoom[]
+
+  @@index([createdAt])
+}
+
+model PvpRoom {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @db.Uuid
+  status         PvpRoomStatus @default(FINISHED)
+  betAmount      Int
+  payout         Int           @default(0)
+  winner         String        @db.VarChar(16)
+  opponentName   String        @default("Arcade Bot") @db.VarChar(64)
+  resultSeed     Int
+  idempotencyKey String        @unique @db.VarChar(191)
+  createdAt      DateTime      @default(now())
+  resolvedAt     DateTime      @default(now())
+  user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Wallet {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  currency  WalletCurrency @default(STARS)
+  balance   Int            @default(0)
+  version   Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entries   LedgerEntry[]
+  gameRounds GameRound[]
+  dailyRewards DailyReward[]
+
+  @@unique([userId, currency])
+  @@index([userId])
+}
+
+model Game {
+  id        String      @id @default(uuid()) @db.Uuid
+  type      GameType    @unique
+  title     String      @db.VarChar(128)
+  isActive  Boolean     @default(true)
+  config    Json
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  rounds    GameRound[]
+  fairnessSeeds ProvablyFairSeed[]
+
+  @@index([isActive])
+}
+
+model GameRound {
+  id             String          @id @default(uuid()) @db.Uuid
+  gameId         String          @db.Uuid
+  userId         String          @db.Uuid
+  walletId       String          @db.Uuid
+  status         GameRoundStatus @default(RESOLVING)
+  betAmount      Int
+  payout         Int             @default(0)
+  selectedSide   String          @db.VarChar(16)
+  result         String          @db.VarChar(16)
+  idempotencyKey String          @unique @db.VarChar(191)
+  createdAt      DateTime        @default(now())
+  resolvedAt     DateTime?
+  fairValue      Int             @default(0)
+  game           Game            @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  wallet         Wallet          @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  fairnessSeed   ProvablyFairSeed?
+
+  @@index([gameId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model ProvablyFairSeed {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid
+  gameId         String    @db.Uuid
+  gameRoundId    String?   @unique @db.Uuid
+  serverSeed     String    @db.VarChar(64)
+  serverSeedHash String    @db.VarChar(64)
+  clientSeed     String?   @db.VarChar(191)
+  nonce          Int       @default(0)
+  createdAt      DateTime  @default(now())
+  usedAt         DateTime?
+  revealedAt     DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  game           Game      @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  gameRound      GameRound? @relation(fields: [gameRoundId], references: [id], onDelete: Restrict)
+
+  @@index([userId, gameId, usedAt])
+  @@index([gameId, createdAt(sort: Desc)])
+  @@index([serverSeedHash])
+}
+
+model LedgerEntry {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  walletId       String          @db.Uuid
+  type           LedgerEntryType
+  amount         Int
+  balanceAfter   Int
+  referenceType  String          @db.VarChar(64)
+  referenceId    String          @db.VarChar(128)
+  idempotencyKey String          @unique @db.VarChar(191)
+  metadata       Json?
+  createdAt      DateTime        @default(now())
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  wallet         Wallet          @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([referenceType, referenceId])
+}
+
+model DailyReward {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  walletId       String   @db.Uuid
+  rewardDate     DateTime @db.Date
+  amount         Int
+  balanceAfter   Int
+  idempotencyKey String   @unique @db.VarChar(191)
+  claimedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  wallet         Wallet   @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, rewardDate])
+  @@index([userId, claimedAt(sort: Desc)])
+  @@index([walletId])
+}

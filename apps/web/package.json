@@ -1,0 +1,39 @@
+{
+  "name": "@night-arcade/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter @night-arcade/shared build",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "eslint src vite.config.ts",
+    "pretest": "pnpm --filter @night-arcade/shared build",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@night-arcade/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.20",
+    "@tma.js/sdk-react": "^3.0.8",
+    "framer-motion": "^12.29.2",
+    "matter-js": "^0.20.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.13.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/matter-js": "^0.20.2",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "jsdom": "^27.4.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}
